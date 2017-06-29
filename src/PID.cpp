@@ -24,8 +24,13 @@ void PID::UpdateError(double cte) {
     i_error += cte;
 }
 
+void PID::Reset() {
+    d_error = 0.0;
+    p_error = 0.0;
+    i_error = 0.0;
+}
+
 double PID::TotalError() {
-    cout << "P_err " << p_error << ", D_err " << d_error << ", I_err " << i_error << endl;
     return Kp * p_error - Kd * d_error + Ki * i_error;
 }
 

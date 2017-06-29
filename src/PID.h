@@ -37,6 +37,11 @@ public:
   */
   void UpdateError(double cte);
 
+  /**
+   * @brief PID::Reset, reset the errors
+   */
+  void Reset();
+
   /*
   * Calculate the total PID error.
   */

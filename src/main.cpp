@@ -28,14 +28,34 @@ std::string hasData(std::string s) {
   return "";
 }
 
+/**
+ * Code snippet from: https://carnd.slack.com/conversation/p-pid/p1494276925735399
+ */
+void reset_simulator(uWS::WebSocket<uWS::SERVER>& ws)
+{
+    // reset
+    std::string msg("42[\"reset\", {}]");
+    ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+}
+
 int main()
 {
   uWS::Hub h;
 
-  PID pid;
-  pid.Init(2.0, 0.0, 20.0);
+  // twiddle
+  int i = 0;
+  bool decreased_p = false;
+  double p[] = {0.23, 0.0, 15.0};
+  double dp[] = {0.1, 0.01, 0.5};
+  double best_err = -1.0;
+  double curr_err = 0.0;
+  int time = 0;
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  PID pid;
+  pid.Init(p[0], p[1], p[2]);
+
+  h.onMessage([&pid, &i, &decreased_p, &p, &dp, &best_err, &curr_err, &time](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -66,7 +86,59 @@ int main()
           }
           
           // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << " (raw: " << raw_steer_value << ")" << std::endl;
+          //std::cout << time << ": CTE: " << cte << " Steering Value: " << steer_value << " (raw: " << raw_steer_value << ")" << std::endl;
+          curr_err += cte * cte;
+          ++time;
+
+          // reset condition
+          if (false) {
+          //if (fabs(cte) > 2.0) {
+              curr_err = 1000000 - (double)time;
+          }
+
+          if (false) {
+          //if (fabs(cte) > 2.0 || time > 2000) {
+              std::cout << "reset " << curr_err << std::endl;
+              if (best_err < 0.0) {
+                  best_err = curr_err;
+                  curr_err = 0.0;
+              }
+
+              if (decreased_p) {
+                  decreased_p = false;
+                  if (curr_err < best_err) {
+                      best_err = curr_err;
+                      dp[i] *= 1.1;
+                  }
+                  else {
+                      p[i] += dp[i];
+                      dp[i] *= 0.9;
+                  }
+              }
+              else {
+                  if (curr_err < best_err) {
+                      best_err = curr_err;
+                      dp[i] *= 1.1;
+                  }
+                  else {
+                      p[i] -= 2 * dp[i];
+                      decreased_p = true;
+                  }
+              }
+
+              i = (i + 1) % 3;
+              p[i] += dp[i];
+
+              pid.Kp = p[0];
+              pid.Ki = p[1];
+              pid.Kd = p[2];
+              std::cout << p[0] << ", " << p[1] << ", " << p[2] << std::endl;
+              time = 0;
+              cte = 0;
+              curr_err = 0;
+              pid.Reset();
+              reset_simulator(ws);
+          }
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
